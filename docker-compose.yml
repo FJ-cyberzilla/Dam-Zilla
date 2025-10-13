@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  zilla-dam:
+    build: .
+    ports:
+      - "3000:3000"
+      - "9229:9229"
+    environment:
+      - NODE_ENV=production
+      - POSTGRES_URL=postgresql://zilla:password@postgres:5432/zilladam
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./data:/usr/src/app/data
+      - ./logs:/usr/src/app/logs
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - zilla-network
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=zilla
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=zilladam
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - zilla-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - zilla-network
+    restart: unless-stopped
+
+  monitoring:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - zilla-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  zilla-network:
+    driver: bridge
