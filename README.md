@@ -16,7 +16,7 @@ ZILLA-DAM is an advanced digital intelligence platform that combines **conscious
 - **🛡️ Advanced Stealth** - Anti-detection, VM evasion, AV bypass
 - **📡 Signal Intelligence** - Cellular, WiFi, GPS, RF analysis
 - **🎯 Digital Forensics** - VPN detection, burner number identification, puppet account analysis
-- **🔐 Quantum Security** - Hardware-locked, self-destruct protocols
+- **🔐 Extreme Security** - Hardware-locked, self-destruct protocols
 
 ## 🚀 Quick Start
 
