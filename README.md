@@ -1,4 +1,4 @@
-# 🐉 ZILLA-DAM 
+# 🐉 DAM-ZillA
 - Digital Fortress & Intelligence Platform
 
 > **Military-Grade OSINT with Conscious AI & Quantum Security**
@@ -7,7 +7,7 @@
 
 ## 🎯 Overview
 
-ZILLA-DAM is an advanced digital intelligence platform that combines **conscious AI decision-making**, **military-grade evasion techniques**, and **comprehensive digital footprint analysis**. Designed for security researchers, penetration testers, and intelligence professionals.
+Dam-Zilla is an advanced digital intelligence platform that combines **conscious AI decision-making**, **military-grade evasion techniques**, and **comprehensive digital footprint analysis**. Designed for security researchers, penetration testers, and intelligence professionals.
 
 ### ⚡ Key Capabilities
 
