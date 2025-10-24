@@ -1,0 +1,68 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.11]
+        go-version: [1.21]
+        julia-version: ['1.10.0']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --- Setup Go ---
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Build Go app
+        run: |
+          go mod tidy
+          go build -v ./...
+
+      - name: Run Go tests
+        run: go test ./...
+
+      # --- Setup Python ---
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Python dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run Python tests
+        run: |
+          if [ -f tests/test_*.py ]; then python -m unittest discover -s tests; fi
+
+      # --- Setup Julia ---
+      - name: Set up Julia ${{ matrix.julia-version }}
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.julia-version }}
+
+      - name: Install Julia packages
+        run: |
+          julia -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
+
+      - name: Run Julia tests
+        run: |
+          if [ -f runtests.jl ]; then julia runtests.jl; fi
+
+      # --- Run Makefile (optional) ---
+      - name: Run Makefile (if exists)
+        run: |
+          if [ -f Makefile ]; then make; fi
