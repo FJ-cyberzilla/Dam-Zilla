@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: Multi-Language CI Pipeline
 
 on:
   push:
@@ -13,26 +13,30 @@ jobs:
     strategy:
       matrix:
         python-version: [3.11]
-        go-version: [1.21]
+        node-version: [20.x]
         julia-version: ['1.10.0']
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --- Setup Go ---
-      - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v5
+      # --- Setup Node.js (JavaScript + TypeScript + CSS) ---
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          node-version: ${{ matrix.node-version }}
 
-      - name: Build Go app
+      - name: Install Node.js dependencies
         run: |
-          go mod tidy
-          go build -v ./...
+          npm install
 
-      - name: Run Go tests
-        run: go test ./...
+      - name: Run JavaScript/TypeScript lint
+        run: |
+          if [ -f .eslintrc.js ] || [ -f .eslintrc.json ]; then npx eslint .; fi
+
+      - name: Run JavaScript/TypeScript tests
+        run: |
+          if [ -f jest.config.js ] || [ -f jest.config.ts ]; then npx jest; fi
 
       # --- Setup Python ---
       - name: Set up Python ${{ matrix.python-version }}
@@ -62,7 +66,12 @@ jobs:
         run: |
           if [ -f runtests.jl ]; then julia runtests.jl; fi
 
-      # --- Run Makefile (optional) ---
-      - name: Run Makefile (if exists)
+      # --- Shell Scripts ---
+      - name: Run Shell scripts (if test.sh exists)
         run: |
-          if [ -f Makefile ]; then make; fi
+          if [ -f test.sh ]; then chmod +x test.sh && ./test.sh; fi
+
+      # --- CSS Validation (Optional) ---
+      - name: Validate CSS (if stylelint config exists)
+        run: |
+          if [ -f .stylelintrc ] || [ -f .stylelintrc.json ]; then npx stylelint "**/*.css"; fi
