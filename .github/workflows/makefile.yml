@@ -21,44 +21,51 @@ jobs:
         shell: bash
 
     steps:
-    - name: 🧾 Checkout repository
-      uses: actions/checkout@v4
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v4
 
-    - name: 🗂️ Setup caching
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache
-          build/
-        key: ${{ runner.os }}-zilla-${{ hashFiles('**/Makefile') }}
-        restore-keys: |
-          ${{ runner.os }}-zilla-
+      - name: 🗂️ Setup caching
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache
+            build/
+          key: ${{ runner.os }}-zilla-${{ hashFiles('**/Makefile') }}
+          restore-keys: |
+            ${{ runner.os }}-zilla-
 
-    - name: 🔐 Set up environment
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential python3 python3-pip nodejs npm
+      - name: 🔐 Set up environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 python3-pip nodejs npm
 
-    - name: 🔧 Make configure executable
-      run: chmod +x config/configure
+      - name: 🔍 Verify configure script exists
+        run: |
+          if [ ! -f config/configure ]; then
+            echo "❌ config/configure not found"
+            exit 1
+          fi
 
-    - name: ⚙️ Run configure
-      run: ./config/configure
+      - name: 🔧 Make configure executable
+        run: chmod +x config/configure
 
-    - name: 📦 Install dependencies
-      run: make
+      - name: ⚙️ Run configure
+        run: ./config/configure
 
-    - name: ✅ Run check
-      run: make check
+      - name: 📦 Install dependencies
+        run: make
 
-    - name: 📦 Run distcheck
-      run: make distcheck
+      - name: ✅ Run check
+        run: make check
 
-    - name: 📤 Upload build artifacts
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: zilla-dist
-        path: |
-          dist/
-          logs/
+      - name: 🧪 Run distcheck
+        run: make distcheck
+
+      - name: 📤 Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zilla-dist
+          path: |
+            dist/
+            logs/
