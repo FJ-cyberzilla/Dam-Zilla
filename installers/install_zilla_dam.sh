@@ -1,6 +1,10 @@
 #!/bin/bash
 
-echo "🐉 ZILLA-DAM CROSS-PLATFORM INSTALLER"
+set -euo pipefail
+LOGFILE="install.log"
+exec > >(tee -a "$LOGFILE") 2>&1
+
+echo "🐉 ZILLA-DAM ENTERPRISE INSTALLER"
 
 detect_platform() {
     case "$(uname -s)" in
@@ -24,20 +28,17 @@ PLATFORM=$(detect_platform)
 echo "🔍 Detected platform: $PLATFORM"
 
 install_dependencies() {
+    echo "📦 Installing dependencies for $PLATFORM..."
     case $PLATFORM in
         "wsl"|"linux")
-            echo "📦 Installing dependencies for Linux/WSL..."
             sudo apt update
             sudo apt install -y nodejs npm python3 python3-pip git curl wget
-            # Install Julia for ML
             wget https://julialang-s3.julialang.org/bin/linux/x64/1.8/julia-1.8.5-linux-x86_64.tar.gz
             tar -xzf julia-1.8.5-linux-x86_64.tar.gz
             sudo mv julia-1.8.5 /opt/
             sudo ln -s /opt/julia-1.8.5/bin/julia /usr/local/bin/julia
             ;;
         "mac")
-            echo "📦 Installing dependencies for macOS..."
-            # Check if Homebrew is installed
             if ! command -v brew &> /dev/null; then
                 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
             fi
@@ -45,44 +46,53 @@ install_dependencies() {
             brew install --cask julia
             ;;
         "termux")
-            echo "📦 Installing dependencies for Termux (Android)..."
             pkg update
             pkg install -y nodejs python git curl wget
-            # Termux-specific limitations
-            echo "⚠️  Note: Julia ML engine limited on Termux"
+            echo "⚠️  Julia ML engine limited on Termux"
+            ;;
+        *)
+            echo "❌ Unsupported platform: $PLATFORM"
+            exit 1
             ;;
     esac
 }
 
 setup_zilla_dam() {
     echo "🚀 Setting up ZILLA-DAM..."
-    
-    # Clone or extract to current directory
+
     if [ ! -d "zilla-dam" ]; then
-        echo "📥 Downloading ZILLA-DAM..."
+        echo "📥 Cloning ZILLA-DAM repository..."
         git clone https://github.com/zilla-dam/zilla-dam.git
     fi
-    
-    cd zilla-dam
-    
-    # Platform-specific configurations
+
+    cd zilla-dam || { echo "❌ Failed to enter zilla-dam directory"; exit 1; }
+
     case $PLATFORM in
         "termux")
             echo "📱 Applying Termux optimizations..."
-            # Reduce memory usage for mobile
             export NODE_OPTIONS="--max-old-space-size=1024"
             ;;
         "wsl")
             echo "🪟 Applying WSL optimizations..."
-            # WSL-specific performance tweaks
             ;;
     esac
-    
-    # Install Node dependencies
-    npm install
-    
-    # Initialize quantum security
-    node security_lock.js --init
+
+    echo "🧹 Sanitizing package files..."
+    sed -i '/"gevent"/d' package.json || true
+    sed -i '/"gevent"/d' package-lock.json || true
+
+    echo "📦 Installing Node.js dependencies..."
+    if ! npm install; then
+        echo "❌ npm install failed. Check package.json for unresolved dependencies."
+        exit 1
+    fi
+
+    echo "🔐 Initializing quantum security..."
+    if [ -f security_lock.js ]; then
+        node security_lock.js --init
+    else
+        echo "⚠️  security_lock.js not found. Skipping quantum security init."
+    fi
 }
 
 install_dependencies
