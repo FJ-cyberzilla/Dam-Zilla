@@ -9,7 +9,7 @@
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "tensorflow": "^4.10.0",
     "@tensorflow/tfjs-node": "^4.15.0",
-    "openvc": "^4.8.0",
+    "@u4/opencv4nodejs": "^5.4.0",  // ← FIXED
     "sharp": "^0.32.0",
     "canvas": "^2.11.2",
     "vm2": "^3.9.19",
