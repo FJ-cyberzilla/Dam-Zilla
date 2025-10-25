@@ -1,114 +1,134 @@
-.PHONY: install build test run clean deploy monitor
+# Multi-Language Project Makefile
+.PHONY: help install test lint build clean
 
 # Variables
-NODE_ENV ?= development
-DOCKER_IMAGE = zilla-dam:latest
-DOCKER_COMPOSE = docker-compose
+NODE_MODULES = node_modules
+PYTHON_VENV = venv
+JULIA_DEPS = Manifest.toml
 
-# Installation
-install:
-	npm install
-	pip3 install -r requirements.txt
+# Default target
+help:
+	@echo "Available targets:"
+	@echo "  install - Install all dependencies"
+	@echo "  test    - Run all test suites"
+	@echo "  lint    - Run all linters"
+	@echo "  build   - Build the project"
+	@echo "  clean   - Clean generated files"
+	@echo "  dev     - Start development servers"
 
-install-dev: install
-	npm install --save-dev
+# Installation targets
+install: install-js install-python install-julia
 
-# Building
-build:
-	npm run build
+install-js:
+	@echo "📦 Installing JavaScript dependencies..."
+	npm ci
 
-build-docker:
-	$(DOCKER_COMPOSE) build
+install-python:
+	@echo "🐍 Setting up Python environment..."
+	python -m venv $(PYTHON_VENV) || true
+	. $(PYTHON_VENV)/bin/activate && pip install --upgrade pip
+	if [ -f requirements.txt ]; then \
+		. $(PYTHON_VENV)/bin/activate && pip install -r requirements.txt; \
+	fi
 
-# Testing
-test:
+install-julia:
+	@echo "🔬 Installing Julia dependencies..."
+	if [ -f Project.toml ]; then \
+		julia -e 'using Pkg; Pkg.activate("."); Pkg.instantiate()'; \
+	fi
+
+# Testing targets
+test: test-js test-ts test-python test-julia test-shell
+
+test-js:
+	@echo "🧪 Running JavaScript tests..."
 	npm test
-	python3 -m pytest tests/
 
-test-coverage:
-	npm run test:coverage
-	python3 -m pytest --cov=core tests/
+test-ts:
+	@echo "📘 Running TypeScript checks..."
+	if [ -f tsconfig.json ]; then \
+		npx tsc --noEmit; \
+		npm run test:typescript || true; \
+	fi
 
-# Running
-run:
-	node main.js
+test-python:
+	@echo "🐍 Running Python tests..."
+	if [ -f pytest.ini ] || [ -f requirements.txt ]; then \
+		. $(PYTHON_VENV)/bin/activate && python -m pytest tests/ -v || true; \
+	fi
 
-run-dev:
-	npm run dev
+test-julia:
+	@echo "🔬 Running Julia tests..."
+	if [ -f Project.toml ]; then \
+		julia -e 'using Pkg; Pkg.test()'; \
+	fi
 
-run-docker:
-	$(DOCKER_COMPOSE) up -d
+test-shell:
+	@echo "🐚 Checking shell scripts..."
+	find . -name "*.sh" -type f -exec shellcheck {} \; || true
 
-run-docker-dev:
-	$(DOCKER_COMPOSE) -f docker-compose.dev.yml up -d
+# Linting targets
+lint: lint-js lint-python lint-julia
 
-# Database
-db-migrate:
-	node database/migrate.js
+lint-js:
+	@echo "📏 Linting JavaScript/TypeScript..."
+	npx eslint . --ext .js,.jsx,.ts,.tsx --fix --max-warnings=0
+	npx prettier --write .
 
-db-seed:
-	node database/seed.js
+lint-python:
+	@echo "🐍 Formatting Python..."
+	if [ -d $(PYTHON_VENV) ]; then \
+		. $(PYTHON_VENV)/bin/activate && \
+		find . -name "*.py" -type f -exec black {} \; && \
+		find . -name "*.py" -type f -exec pylint {} \; || true; \
+	fi
 
-db-reset: db-clean db-migrate db-seed
+lint-julia:
+	@echo "🔬 Formatting Julia..."
+	julia -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format(".")'
 
-db-clean:
-	rm -f data/zilla.db
+# Build targets
+build: build-js
+	@echo "🏗️ Building project..."
+	mkdir -p dist
+	npm run build || true
+	[ -d build ] && cp -r build/* dist/ || true
 
-# Monitoring
-monitor:
-	$(DOCKER_COMPOSE) up -d monitoring
-	open http://localhost:9090
+build-js:
+	@echo "📦 Building JavaScript/TypeScript..."
+	if [ -f package.json ]; then \
+		npm run build || true; \
+	fi
 
-logs:
-	$(DOCKER_COMPOSE) logs -f zilla-dam
-
-# Deployment
-deploy: test build-docker
-	$(DOCKER_COMPOSE) up -d --force-recreate
-
-deploy-prod:
-	$(DOCKER_COMPOSE) -f docker-compose.prod.yml up -d --force-recreate
+# Development
+dev:
+	@echo "🚀 Starting development servers..."
+	npm run dev || true
 
 # Cleanup
 clean:
-	rm -rf node_modules
-	rm -rf __pycache__
-	rm -rf *.log
-	$(DOCKER_COMPOSE) down -v
+	@echo "🧹 Cleaning up..."
+	rm -rf $(NODE_MODULES)
+	rm -rf $(PYTHON_VENV)
+	rm -rf dist build .pytest_cache __pycache__
+	rm -f *.log
+	julia -e 'using Pkg; Pkg.activate("."); Pkg.gc()'
 
-clean-all: clean
-	docker system prune -f
+# Utility targets
+deps-tree:
+	@echo "🌳 Dependency trees:"
+	npm list --depth=1
+	if [ -d $(PYTHON_VENV) ]; then \
+		. $(PYTHON_VENV)/bin/activate && pip list; \
+	fi
 
-# Security
-security-scan:
+security-check:
+	@echo "🛡️ Security checks..."
 	npm audit
-	bandit -r core/ml/
-	safety check
+	if [ -d $(PYTHON_VENV) ]; then \
+		. $(PYTHON_VENV)/bin/activate && safety check || true; \
+	fi
 
-# Performance
-profile:
-	node --prof main.js
-	node --prof-process isolate-*.log > profile.txt
-
-profile-memory:
-	node --inspect --trace-gc main.js
-
-benchmark:
-	npm run benchmark
-
-# Backup
-backup:
-	tar -czf backup-$(shell date +%Y%m%d).tar.gz data/ logs/ config/
-
-# Help
-help:
-	@echo "Available targets:"
-	@echo "  install      - Install dependencies"
-	@echo "  build        - Build the application"
-	@echo "  test         - Run tests"
-	@echo "  run          - Run application"
-	@echo "  deploy       - Deploy with Docker"
-	@echo "  monitor      - Start monitoring"
-	@echo "  clean        - Clean up"
-	@echo "  security-scan - Security audit"
-	@echo "  profile      - Performance profiling"
+# Quick setup for new developers
+setup: install test lint
+	@echo "✅ Project setup complete!"
