@@ -22,12 +22,23 @@ jobs:
           echo "echo 'Configuration loaded'" >> config/configure
           chmod +x config/configure
 
-      - name: 🗑️ Remove Broken OpenVC Dependency
+      - name: 🗑️ FIX OPENVC - Remove from package.json
         run: |
-          # Remove openvc from package.json
-          npm remove openvc || true
-          # Or manually edit package.json
-          sed -i '/"openvc"/d' package.json || true
+          # Check if openvc exists in package.json
+          if grep -q '"openvc"' package.json; then
+            echo "🚨 Removing broken 'openvc' dependency from package.json..."
+            # Use Node.js to properly remove the dependency
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              delete pkg.dependencies.openvc;
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+              console.log('✅ Removed openvc from package.json');
+            "
+            cat package.json | grep -i openvc || echo "✅ openvc completely removed"
+          else
+            echo "✅ No openvc found in package.json"
+          fi
 
       - name: 🏗️ Setup Node.js
         uses: actions/setup-node@v4
