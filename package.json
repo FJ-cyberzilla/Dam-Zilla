@@ -9,7 +9,7 @@
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "tensorflow": "^4.10.0",
     "@tensorflow/tfjs-node": "^4.15.0",
-    "@u4/opencv4nodejs": "^5.4.0",
+    "openvc": "^4.8.0", 
     "sharp": "^0.32.0",
     "canvas": "^2.11.2",
     "vm2": "^3.9.19",
@@ -21,12 +21,5 @@
     "systeminformation": "^5.18.0",
     "os-utils": "^0.0.14",
     "pidusage": "^3.0.2"
-  },
-  "scripts": {
-    "start": "node --max-old-space-size=4096 --max-semi-space-size=128 main.js",
-    "start:optimized": "node --max-old-space-size=8192 --max-semi-space-size=256 --optimize-for-size main.js",
-    "profile": "node --prof --max-old-space-size=4096 main.js",
-    "profile:memory": "node --inspect --max-old-space-size=4096 main.js",
-    "benchmark": "node benchmark.js"
   }
 }
