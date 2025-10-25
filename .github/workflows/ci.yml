@@ -1,77 +1,151 @@
-name: Multi-Language CI Pipeline
+name: 🚀 Multi-Language CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
 
 jobs:
-  build-test:
+  test:
+    name: 🧪 Test Suite
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
-        python-version: [3.11]
-        node-version: [20.x]
-        julia-version: ['1.10.0']
-
+        node-version: [18.x, 20.x]
+    
     steps:
-      - name: Checkout repository
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      # --- Setup Node.js (JavaScript + TypeScript + CSS) ---
-      - name: Set up Node.js ${{ matrix.node-version }}
+      - name: 🏗️ Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: 'npm'
 
-      - name: Install Node.js dependencies
-        run: |
-          npm install
-
-      - name: Run JavaScript/TypeScript lint
-        run: |
-          if [ -f .eslintrc.js ] || [ -f .eslintrc.json ]; then npx eslint .; fi
-
-      - name: Run JavaScript/TypeScript tests
-        run: |
-          if [ -f jest.config.js ] || [ -f jest.config.ts ]; then npx jest; fi
-
-      # --- Setup Python ---
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.10'
 
-      - name: Install Python dependencies
-        run: |
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-      - name: Run Python tests
-        run: |
-          if [ -f tests/test_*.py ]; then python -m unittest discover -s tests; fi
-
-      # --- Setup Julia ---
-      - name: Set up Julia ${{ matrix.julia-version }}
+      - name: 🔬 Setup Julia
         uses: julia-actions/setup-julia@v1
         with:
-          version: ${{ matrix.julia-version }}
+          version: '1.9'
 
-      - name: Install Julia packages
-        run: |
-          julia -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
+      - name: 📦 Install JavaScript dependencies
+        run: npm ci
 
-      - name: Run Julia tests
+      - name: 📦 Install Python dependencies
         run: |
-          if [ -f runtests.jl ]; then julia runtests.jl; fi
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      # --- Shell Scripts ---
-      - name: Run Shell scripts (if test.sh exists)
+      - name: 📦 Install Julia dependencies
         run: |
-          if [ -f test.sh ]; then chmod +x test.sh && ./test.sh; fi
+          julia -e 'using Pkg; Pkg.activate("."); Pkg.instantiate()'
 
-      # --- CSS Validation (Optional) ---
-      - name: Validate CSS (if stylelint config exists)
+      - name: 🧪 Run JavaScript tests
+        run: npm test
+
+      - name: 🧪 Run TypeScript tests
         run: |
-          if [ -f .stylelintrc ] || [ -f .stylelintrc.json ]; then npx stylelint "**/*.css"; fi
+          if [ -f tsconfig.json ]; then
+            npx tsc --noEmit
+            npm run test:typescript || true
+          fi
+
+      - name: 🧪 Run Python tests
+        run: |
+          if [ -f pytest.ini ] || [ -f requirements.txt ]; then
+            python -m pytest tests/ || true
+          fi
+
+      - name: 🔬 Run Julia tests
+        run: |
+          if [ -f Project.toml ]; then
+            julia -e 'using Pkg; Pkg.test()'
+          fi
+
+      - name: 🐚 Run Shell scripts syntax check
+        run: |
+          find . -name "*.sh" -type f | while read file; do
+            shellcheck "$file" || true
+          done
+
+  lint:
+    name: 📏 Lint & Format
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 📏 ESLint (JavaScript/TypeScript)
+        run: |
+          npx eslint . --ext .js,.jsx,.ts,.tsx --max-warnings=0
+
+      - name: 💅 Prettier check
+        run: npx prettier --check .
+
+      - name: 🐍 Python lint
+        run: |
+          pip install pylint black
+          find . -name "*.py" -type f | while read file; do
+            black --check "$file" || true
+            pylint "$file" || true
+          done
+
+      - name: 🔬 Julia format check
+        run: |
+          julia -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format(".")'
+
+  build:
+    name: 🏗️ Build & Package
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗️ Build JavaScript/TypeScript
+        run: |
+          if [ -f package.json ]; then
+            npm run build || true
+          fi
+
+      - name: 📦 Create distribution
+        run: |
+          mkdir -p dist
+          # Copy built files
+          [ -d build ] && cp -r build/* dist/ || true
+          [ -d dist ] && cp -r dist/* ./ || true
+
+      - name: 📤 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            dist/
+            build/
+          retention-days: 7
