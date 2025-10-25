@@ -1,0 +1,53 @@
+# .github/workflows/issue-response.yml
+name: 🤖 Issue Triage
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📝 Check Issue Quality
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            
+            // Check if issue has minimal description
+            const hasGoodDescription = issue.body && issue.body.length > 50;
+            const hasCodeReference = issue.body && issue.body.includes('recon_master.js');
+            
+            if (!hasGoodDescription && hasCodeReference) {
+              // Add comment asking for more details
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `
+### 👋 Thanks for reporting an issue!
+
+🔍 **I see you referenced code in \`recon_master.js\` - could you please provide more details?**
+
+**To help us resolve this quickly, please include:**
+- 🐛 **What's the problem?** (error message, unexpected behavior)
+- 🔧 **Steps to reproduce** (how can we see the issue?)
+- ✅ **Expected behavior** (what should happen instead?)
+- 📱 **Environment** (OS, Node.js version, etc.)
+
+**Without these details, it's hard for us to investigate!**
+
+---
+*This is an automated response to help improve issue quality.*
+                `
+              });
+              
+              // Add label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['needs-info']
+              });
+            }
