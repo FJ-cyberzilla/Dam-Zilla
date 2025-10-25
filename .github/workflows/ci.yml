@@ -22,6 +22,13 @@ jobs:
           echo "echo 'Configuration loaded'" >> config/configure
           chmod +x config/configure
 
+      - name: 🗑️ Remove Broken OpenVC Dependency
+        run: |
+          # Remove openvc from package.json
+          npm remove openvc || true
+          # Or manually edit package.json
+          sed -i '/"openvc"/d' package.json || true
+
       - name: 🏗️ Setup Node.js
         uses: actions/setup-node@v4
         with:
