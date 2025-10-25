@@ -1,4 +1,4 @@
-name: 🛡️ Zilla-Dam CI/CD
+name: 🛡️ Zilla-Dam CI
 
 on:
   push:
@@ -7,220 +7,21 @@ on:
     branches: [ main ]
 
 jobs:
-  install-test:
-    name: 📦 Install & Test
+  test:
+    name: 🧪 Test
     runs-on: ubuntu-latest
-    
     steps:
-      - name: 📥 Checkout code
+      - name: 📥 Checkout
         uses: actions/checkout@v4
-
-      - name: 🔧 Create Configure Script
-        run: |
-          mkdir -p config
-          # Create the configure file with your installer script
-          cat > config/configure << 'EOF'
-#!/bin/bash
-
-set -euo pipefail
-LOGFILE="install.log"
-exec > >(tee -a "$LOGFILE") 2>&1
-
-echo "🐉 ZILLA-DAM ENTERPRISE INSTALLER"
-
-detect_platform() {
-    case "$(uname -s)" in
-        Linux*)     
-            if [[ -f "/proc/version" ]] && grep -q "Microsoft" /proc/version; then
-                echo "wsl"
-            elif [[ -f "/etc/termux" ]]; then
-                echo "termux" 
-            else
-                echo "linux"
-            fi
-            ;;
-        Darwin*)    echo "mac" ;;
-        CYGWIN*)    echo "cygwin" ;;
-        MINGW*)     echo "gitbash" ;;
-        *)          echo "unknown" ;;
-    esac
-}
-
-PLATFORM=$(detect_platform)
-echo "🔍 Detected platform: $PLATFORM"
-
-install_dependencies() {
-    echo "📦 Installing dependencies for $PLATFORM..."
-    case $PLATFORM in
-        "wsl"|"linux")
-            sudo apt update
-            sudo apt install -y nodejs npm python3 python3-pip git curl wget
-            wget https://julialang-s3.julialang.org/bin/linux/x64/1.8/julia-1.8.5-linux-x86_64.tar.gz
-            tar -xzf julia-1.8.5-linux-x86_64.tar.gz
-            sudo mv julia-1.8.5 /opt/
-            sudo ln -s /opt/julia-1.8.5/bin/julia /usr/local/bin/julia
-            ;;
-        "mac")
-            if ! command -v brew &> /dev/null; then
-                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            fi
-            brew install node npm python3 git curl wget
-            brew install --cask julia
-            ;;
-        "termux")
-            pkg update
-            pkg install -y nodejs python git curl wget
-            echo "⚠️  Julia ML engine limited on Termux"
-            ;;
-        *)
-            echo "❌ Unsupported platform: $PLATFORM"
-            exit 1
-            ;;
-    esac
-}
-
-setup_zilla_dam() {
-    echo "🚀 Setting up ZILLA-DAM..."
-
-    if [ ! -d "zilla-dam" ]; then
-        echo "📥 Cloning ZILLA-DAM repository..."
-        git clone https://github.com/zilla-dam/zilla-dam.git
-    fi
-
-    cd zilla-dam || { echo "❌ Failed to enter zilla-dam directory"; exit 1; }
-
-    case $PLATFORM in
-        "termux")
-            echo "📱 Applying Termux optimizations..."
-            export NODE_OPTIONS="--max-old-space-size=1024"
-            ;;
-        "wsl")
-            echo "🪟 Applying WSL optimizations..."
-            ;;
-    esac
-
-    echo "🧹 Sanitizing package files..."
-    sed -i '/"gevent"/d' package.json || true
-    sed -i '/"gevent"/d' package-lock.json || true
-
-    echo "📦 Installing Node.js dependencies..."
-    if ! npm install; then
-        echo "❌ npm install failed. Check package.json for unresolved dependencies."
-        exit 1
-    fi
-
-    echo "🔐 Initializing quantum security..."
-    if [ -f security_lock.js ]; then
-        node security_lock.js --init
-    else
-        echo "⚠️  security_lock.js not found. Skipping quantum security init."
-    fi
-}
-
-install_dependencies
-setup_zilla_dam
-
-echo "✅ ZILLA-DAM installation complete for $PLATFORM!"
-echo "🚀 Start with: cd zilla-dam && ./startup.sh"
-EOF
-
-          chmod +x config/configure
-          echo "✅ Created config/configure with full installer"
-
-      - name: 🗑️ FIX OPENVC - Remove from package.json
-        run: |
-          # Check if openvc exists in package.json
-          if grep -q '"openvc"' package.json; then
-            echo "🚨 Removing broken 'openvc' dependency from package.json..."
-            # Use Node.js to properly remove the dependency
-            node -e "
-              const fs = require('fs');
-              const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-              delete pkg.dependencies.openvc;
-              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-              console.log('✅ Removed openvc from package.json');
-            "
-            cat package.json | grep -i openvc || echo "✅ openvc completely removed"
-          else
-            echo "✅ No openvc found in package.json"
-          fi
-
-      - name: 🏗️ Setup Node.js
+        
+      - name: 🏗️ Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
           cache: 'npm'
-
-      - name: 🔧 Install Browser Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libnss3 \
-            libatk-bridge2.0-0 \
-            libdrm-dev \
-            libxkbcommon-dev \
-            libxcomposite-dev \
-            libxdamage-dev \
-            libxrandr-dev \
-            libgbm-dev \
-            libasound2
-
-      - name: 📦 Install NPM Dependencies
-        env:
-          DD_API_KEY: "skip"
-          DD_APP_KEY: "skip"
-        run: |
-          npm ci
-          npx playwright install
-          npx playwright install-deps
-
-      - name: 🔒 Security Audit
-        run: |
-          npm audit --audit-level=high || true
-
-      - name: 🧪 Run Tests
-        run: |
-          npm test || echo "Tests completed"
-
-      - name: 🏗️ Build Check
-        run: |
-          npm run build || echo "No build script - continuing"
-
-  performance:
-    name: 📊 Performance Check
-    runs-on: ubuntu-latest
-    needs: install-test
-    
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-
-      - name: 🏗️ Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18.x'
-          cache: 'npm'
-
-      - name: 📦 Quick Install
-        env:
-          DD_API_KEY: "skip"
-          DD_APP_KEY: "skip"
-        run: |
-          npm ci
-
-      - name: 🔍 Memory Test
-        run: |
-          node --max-old-space-size=4096 -e "
-            console.log('✅ Node.js running with 4GB heap');
-            const used = process.memoryUsage();
-            console.log('Memory usage:', used);
-          "
-
-      - name: 📈 Performance Summary
-        run: |
-          echo "## 🚀 Zilla-Dam Performance Report" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Dependencies installed successfully" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Browser automation ready (Playwright/Puppeteer)" >> $GITHUB_STEP_SUMMARY
-          echo "✅ TensorFlow.js configured" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Memory optimized (4GB heap)" >> $GITHUB_STEP_SUMMARY
-          echo "🔧 Features: AI, Web Scraping, Image Processing" >> $GITHUB_STEP_SUMMARY
+          
+      - name: 📦 Install
+        run: npm ci
+        
+      - name: 🧪 Test
+        run: npm test
